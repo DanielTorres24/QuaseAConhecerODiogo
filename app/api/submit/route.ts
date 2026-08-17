@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
       });
 
       await db.query(
-        `INSERT INTO responses (participant_id, question_key, question_text, answer, created_at)
+        `INSERT INTO responses (participant_id, question_key, question_text, answer)
          VALUES ${placeholders.join(', ')};`,
         values,
       );

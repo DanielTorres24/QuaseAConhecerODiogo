@@ -7,9 +7,14 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run",
     "migrate": "node database/migrate.js",
     "seed": "node database/seed.js",
-    "reset": "node database/reset.js"
+    "reset": "node database/reset.js",
+    "db:start": "powershell -ExecutionPolicy Bypass -File tools/pg-local.ps1 start",
+    "db:stop": "powershell -ExecutionPolicy Bypass -File tools/pg-local.ps1 stop",
+    "db:status": "powershell -ExecutionPolicy Bypass -File tools/pg-local.ps1 status",
+    "db:reset": "powershell -ExecutionPolicy Bypass -File tools/pg-local.ps1 reset"
   },
   "dependencies": {
     "dotenv": "^17.4.2",
@@ -25,6 +30,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.1",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.10"
   }
 }

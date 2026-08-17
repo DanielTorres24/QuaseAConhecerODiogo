@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { isValidAdminCredentials } from '@/lib/auth';
+import { createAdminToken, isValidAdminCredentials } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,9 +11,8 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'Credenciais inválidas.' }, { status: 401 });
     }
 
-    const token = Buffer.from(`${username}:${Date.now()}`).toString('base64');
-    return Response.json({ token });
-  } catch (error) {
+    return Response.json({ token: createAdminToken(username) });
+  } catch {
     return Response.json({ error: 'Falha ao iniciar sessão.' }, { status: 500 });
   }
 }

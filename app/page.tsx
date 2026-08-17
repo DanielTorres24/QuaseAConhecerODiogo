@@ -2,293 +2,368 @@
 
 import { useMemo, useState } from 'react';
 import styles from './page.module.css';
-import { allQuestions, getInitialAnswerState, quizSections } from '@/lib/quiz';
+import StatsPanel from './StatsPanel';
+import {
+  allQuestions,
+  bonusQuestions,
+  coreQuestions,
+  getInitialAnswerState,
+  isOtherOption,
+  quizSections,
+  resolveAnswer,
+  type QuestionDefinition,
+  type QuizSection,
+} from '@/lib/quiz';
+
+type Phase = 'name' | 'quiz' | 'done';
+
+/**
+ * Larguras proporcionais ao recorte real de cada boneco, para que a altura
+ * seja comum e nenhum apareca esticado ou cortado.
+ */
+const CLOTHESLINE = [
+  { src: '/convite/sapatinhos.png', width: 70 },
+  { src: '/convite/gorro.png', width: 52 },
+  { src: '/convite/body.png', width: 68 },
+  { src: '/convite/coelho.png', width: 45 },
+];
+
+function Clothesline() {
+  return (
+    <div className={styles.clothesline}>
+      {CLOTHESLINE.map((item) => (
+        <span
+          key={item.src}
+          className={styles.clotheslineItem}
+          style={{ backgroundImage: `url(${item.src})`, width: item.width }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/** Agrupa uma lista de perguntas pelas seccoes a que pertencem. */
+function groupBySection(questions: QuestionDefinition[]) {
+  return quizSections
+    .map((section) => ({
+      section,
+      questions: questions.filter((question) => question.section === section.id),
+    }))
+    .filter((group) => group.questions.length > 0);
+}
 
 export default function HomePage() {
-  const [stepIndex, setStepIndex] = useState(0);
+  const [phase, setPhase] = useState<Phase>('name');
   const [name, setName] = useState('');
-  const [answers, setAnswers] = useState<Record<string, string>>(() => getInitialAnswerState());
-  const [status, setStatus] = useState<{ type: 'idle' | 'error' | 'success'; message?: string }>({ type: 'idle' });
+  const [answers, setAnswers] = useState<Record<string, string>>(getInitialAnswerState);
+  const [otherTexts, setOtherTexts] = useState<Record<string, string>>({});
+  const [showBonus, setShowBonus] = useState(false);
+  const [error, setError] = useState('');
+  const [isChecking, setIsChecking] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [nameCheckState, setNameCheckState] = useState<{ loading: boolean; available: boolean | null }>({ loading: false, available: null });
 
-  const currentSection = quizSections[stepIndex - 1] ?? null;
-  const progress = ((stepIndex + 1) / (quizSections.length + 1)) * 100;
+  const coreGroups = useMemo(() => groupBySection(coreQuestions), []);
+  const bonusGroups = useMemo(() => groupBySection(bonusQuestions), []);
 
-  const answeredCount = useMemo(
-    () => Object.values(answers).filter((value) => value && String(value).trim() !== '').length,
-    [answers],
+  const answeredCore = coreQuestions.filter((question) => (answers[question.key] ?? '').trim() !== '').length;
+  const progress = (answeredCore / coreQuestions.length) * 100;
+
+  const setAnswer = (key: string, value: string) => {
+    setAnswers((previous) => ({ ...previous, [key]: value }));
+  };
+
+  const startQuiz = async () => {
+    const trimmed = name.trim();
+
+    if (!trimmed) {
+      setError('Parece que ainda faltou o teu nome.');
+      return;
+    }
+
+    setIsChecking(true);
+    setError('');
+
+    try {
+      const response = await fetch(`/api/check-name?name=${encodeURIComponent(trimmed)}`);
+      const data = await response.json();
+
+      if (!data.available) {
+        setError(data.error || 'Este nome já foi usado. Escolhe outro (ou acrescenta o apelido).');
+        setIsChecking(false);
+        return;
+      }
+    } catch {
+      setError('Não foi possível verificar o nome. Verifica a ligação e tenta outra vez.');
+      setIsChecking(false);
+      return;
+    }
+
+    setIsChecking(false);
+    setPhase('quiz');
+  };
+
+  const submit = async () => {
+    setIsSubmitting(true);
+    setError('');
+
+    const payload = Object.fromEntries(
+      allQuestions.map((question) => [
+        question.key,
+        resolveAnswer(answers[question.key] ?? '', otherTexts[question.key] ?? ''),
+      ]),
+    );
+
+    try {
+      const response = await fetch('/api/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, answers: payload }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || 'O palpite não pôde ser guardado.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      window.scrollTo({ top: 0 });
+      setPhase('done');
+    } catch {
+      setError('Não foi possível ligar ao servidor. Verifica a ligação e tenta outra vez.');
+    }
+
+    setIsSubmitting(false);
+  };
+
+  /** Uma pergunta: etiqueta + campo. Sem transicoes, tudo visivel de uma vez. */
+  const renderQuestion = (question: QuestionDefinition) => {
+    const value = answers[question.key] ?? '';
+    const showOther = question.type === 'select' && isOtherOption(value);
+    const fieldId = `q-${question.key}`;
+
+    return (
+      <div className={styles.questionBlock} key={question.key}>
+        <label className={styles.questionLabel} htmlFor={fieldId}>
+          {question.label}
+        </label>
+
+        {question.type === 'select' && (
+          <select
+            id={fieldId}
+            className={styles.field}
+            value={value}
+            onChange={(event) => setAnswer(question.key, event.target.value)}
+          >
+            <option value="">Escolhe uma opção…</option>
+            {question.options.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        )}
+
+        {showOther && (
+          <input
+            className={styles.field}
+            value={otherTexts[question.key] ?? ''}
+            onChange={(event) =>
+              setOtherTexts((previous) => ({ ...previous, [question.key]: event.target.value }))
+            }
+            placeholder="Então diz-nos qual…"
+            aria-label="Escreve a tua resposta"
+          />
+        )}
+
+        {(question.type === 'text' ||
+          question.type === 'date' ||
+          question.type === 'time' ||
+          question.type === 'number') && (
+          <input
+            id={fieldId}
+            className={styles.field}
+            type={question.type}
+            value={value}
+            onChange={(event) => setAnswer(question.key, event.target.value)}
+            placeholder={
+              question.type === 'text' || question.type === 'number' ? question.placeholder : undefined
+            }
+            min={question.type === 'number' ? question.min : undefined}
+            max={question.type === 'number' ? question.max : undefined}
+            step={question.type === 'number' ? question.step : undefined}
+            inputMode={question.type === 'number' ? 'decimal' : undefined}
+          />
+        )}
+
+        {question.type === 'textarea' && (
+          <textarea
+            id={fieldId}
+            className={`${styles.field} ${styles.textarea}`}
+            value={value}
+            onChange={(event) => setAnswer(question.key, event.target.value)}
+            placeholder={question.placeholder}
+          />
+        )}
+      </div>
+    );
+  };
+
+  const renderGroup = (group: { section: QuizSection; questions: QuestionDefinition[] }) => (
+    <section className={styles.group} key={group.section.id}>
+      <div className={styles.sectionHead}>
+        <span className={styles.sectionIcon} style={{ backgroundImage: `url(${group.section.icon})` }} />
+        <div className={styles.sectionMeta}>
+          <span className={styles.sectionName}>{group.section.title}</span>
+          <span className={styles.sectionSubtitle}>{group.section.subtitle}</span>
+        </div>
+      </div>
+
+      <div className={styles.dotted} />
+
+      {group.questions.map(renderQuestion)}
+    </section>
   );
 
-  const updateAnswer = (key: string, value: string) => {
-    setAnswers((prev) => ({ ...prev, [key]: value }));
-  };
+  /* ------------------------------------------------------------------ */
+  /* Ecra final                                                          */
+  /* ------------------------------------------------------------------ */
 
-  const validateName = async () => {
-    if (!name.trim()) {
-      setStatus({ type: 'error', message: 'Parece que ainda faltou o teu nome.' });
-      return false;
-    }
+  if (phase === 'done') {
+    const myAnswers = Object.fromEntries(
+      allQuestions.map((question) => [
+        question.key,
+        resolveAnswer(answers[question.key] ?? '', otherTexts[question.key] ?? ''),
+      ]),
+    );
 
-    setNameCheckState({ loading: true, available: null });
-    const response = await fetch(`/api/check-name?name=${encodeURIComponent(name)}`);
-    const data = await response.json();
-    setNameCheckState({ loading: false, available: data.available });
-
-    if (!data.available) {
-      setStatus({ type: 'error', message: data.error || 'Este nome já foi usado. Escolha outro.' });
-      return false;
-    }
-
-    return true;
-  };
-
-  const nextStep = async () => {
-    if (stepIndex === 0) {
-      const valid = await validateName();
-      if (!valid) return;
-    }
-
-    if (stepIndex < quizSections.length) {
-      setStepIndex((current) => current + 1);
-      setStatus({ type: 'idle' });
-    }
-  };
-
-  const prevStep = () => {
-    if (stepIndex > 0) {
-      setStepIndex((current) => current - 1);
-      setStatus({ type: 'idle' });
-    }
-  };
-
-  const submitQuiz = async () => {
-    if (!name.trim()) {
-      setStatus({ type: 'error', message: 'Parece que ainda faltou o teu nome.' });
-      setStepIndex(0);
-      return;
-    }
-
-    setIsSubmitting(true);
-    setStatus({ type: 'idle' });
-
-    const response = await fetch('/api/submit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, answers }),
-    });
-
-    const data = await response.json();
-    setIsSubmitting(false);
-
-    if (!response.ok) {
-      setStatus({ type: 'error', message: data.error || 'O palpite não pôde ser guardado.' });
-      return;
-    }
-
-    setStepIndex(quizSections.length + 1);
-    setStatus({ type: 'success', message: 'Palpite registado! 🔮' });
-  };
-
-  if (stepIndex >= quizSections.length + 1) {
     return (
       <div className={styles.pageShell}>
         <div className={styles.successCard}>
-          <p className={styles.kicker}>Palpite registado</p>
-          <h1>“Palpite registado! 🔮”</h1>
-          <p>
-            Obrigado por ajudares a prever o Diogo! Agora só falta esperar para descobrir quem é realmente o Nostradamus da família e dos amigos. 👶🏻✨
+          <Clothesline />
+          <h1 className={styles.successTitle}>Palpite registado! 🔮</h1>
+          <p className={styles.successText}>
+            Obrigado por ajudares a prever o Diogo! Agora só falta esperar para descobrir quem é
+            realmente o Nostradamus da família e dos amigos. 👶🏻✨
           </p>
-          <p>
-            E, um dia, o Diogo poderá ler tudo aquilo que imaginávamos sobre ele antes de o conhecermos.
+
+          <StatsPanel myAnswers={myAnswers} />
+        </div>
+      </div>
+    );
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Ecra inicial (nome)                                                 */
+  /* ------------------------------------------------------------------ */
+
+  if (phase === 'name') {
+    return (
+      <div className={styles.pageShell}>
+        <div className={styles.card}>
+          <div className={styles.hero}>
+            <span className={styles.heroBadge}>Baby Shower</span>
+            <h1 className={styles.heroTitle}>Antes de Conhecermos o Diogo…</h1>
+            <p className={styles.heroText}>
+              Data, peso, parecenças, feitio e muito mais. Deixa o teu palpite e vamos descobrir
+              quem conhece melhor o Diogo antes de ele chegar.
+            </p>
+            <Clothesline />
+          </div>
+
+          <div className={styles.questionBlock}>
+            <label className={styles.fieldLabel} htmlFor="participant-name">
+              Como te chamas?
+            </label>
+            <input
+              id="participant-name"
+              className={styles.field}
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') void startQuiz();
+              }}
+              placeholder="O teu nome"
+              autoComplete="name"
+              enterKeyHint="go"
+            />
+            <p className={styles.hint}>
+              Só podes responder uma vez, por isso escreve o nome pelo qual toda a gente te conhece.
+            </p>
+          </div>
+
+          {error && <p className={styles.error}>{error}</p>}
+
+          <button
+            type="button"
+            className={`${styles.btn} ${styles.btnPrimary} ${styles.btnWide}`}
+            onClick={startQuiz}
+            disabled={isChecking}
+          >
+            {isChecking ? 'A verificar…' : 'Começar a dar palpites'}
+          </button>
+
+          <p className={styles.hint}>
+            São {coreQuestions.length} perguntas e podes deixar em branco as que quiseres.
           </p>
         </div>
       </div>
     );
   }
 
-  const isFinalReview = stepIndex === quizSections.length;
+  /* ------------------------------------------------------------------ */
+  /* Todas as perguntas numa so pagina                                   */
+  /* ------------------------------------------------------------------ */
 
   return (
     <div className={styles.pageShell}>
-      <div className={styles.appCard}>
-        <header className={styles.header}>
-          <div className={styles.badge}>Baby Shower</div>
-          <h1>Antes de Conhecermos o Diogo…</h1>
-          <p>
-            Data, peso, altura, feitio, parecenças e muito mais. Deixa o teu palpite e vamos descobrir quem conhece melhor o Diogo antes de ele chegar.
-          </p>
-          <div className={styles.progressWrap}>
-            <div className={styles.progressBar} style={{ width: `${progress}%` }} />
-          </div>
-        </header>
+      <div className={styles.stickyBar}>
+        <div className={styles.progressTrack}>
+          <div className={styles.progressFill} style={{ width: `${progress}%` }} />
+        </div>
+        <span className={styles.progressLabel}>
+          {answeredCore}/{coreQuestions.length}
+        </span>
+      </div>
 
-        <main className={styles.formSection}>
-          {stepIndex === 0 && (
-            <section className={styles.formPanel}>
-              <div className={styles.sectionIntro}>
-                <span className={styles.sectionNumber}>1</span>
-                <div>
-                  <h2>Bem-vindo!</h2>
-                  <p>Antes de começares, diz-nos quem és.</p>
-                </div>
-              </div>
+      <div className={styles.card}>
+        <p className={styles.formIntro}>
+          Olá, <strong>{name.trim()}</strong>! Responde ao teu ritmo — o que não souberes, deixa em
+          branco.
+        </p>
 
-              <label className={styles.inputGroup}>
-                <span>Nome</span>
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  placeholder="Escreve o teu nome"
-                  required
-                />
-              </label>
+        {coreGroups.map(renderGroup)}
 
-              {nameCheckState.available === false && (
-                <div className={`${styles.alert} ${styles.error}`}>Este nome já foi usado. Escolha outro.</div>
-              )}
-            </section>
+        <div className={styles.bonusBox}>
+          {showBonus ? (
+            <>
+              <p className={styles.bonusIntro}>
+                Boa! Mais {bonusQuestions.length} para quem está mesmo inspirado. 👇
+              </p>
+              {bonusGroups.map(renderGroup)}
+            </>
+          ) : (
+            <button
+              type="button"
+              className={`${styles.btn} ${styles.btnGhost} ${styles.btnWide}`}
+              onClick={() => setShowBonus(true)}
+            >
+              + Quero {bonusQuestions.length} perguntas extra (opcional)
+            </button>
           )}
+        </div>
 
-          {stepIndex > 0 && stepIndex < quizSections.length && currentSection && (
-            <section className={styles.formPanel}>
-              <div className={styles.sectionIntro}>
-                <span className={styles.sectionNumber}>{stepIndex}</span>
-                <div>
-                  <h2>{currentSection.title}</h2>
-                  <p>{currentSection.subtitle}</p>
-                </div>
-              </div>
+        {error && <p className={styles.error}>{error}</p>}
 
-              <div className={styles.questionList}>
-                {currentSection.questions.map((question) => (
-                  <div key={question.key} className={styles.questionBlock}>
-                    <label className={styles.questionLabel}>{question.label}</label>
-
-                    {question.type === 'text' && (
-                      <input
-                        type="text"
-                        value={answers[question.key] || ''}
-                        onChange={(event) => updateAnswer(question.key, event.target.value)}
-                        placeholder={question.placeholder || ''}
-                      />
-                    )}
-
-                    {question.type === 'textarea' && (
-                      <textarea
-                        value={answers[question.key] || ''}
-                        onChange={(event) => updateAnswer(question.key, event.target.value)}
-                        placeholder={question.placeholder || ''}
-                        rows={5}
-                      />
-                    )}
-
-                    {question.type === 'date' && (
-                      <input
-                        type="date"
-                        value={answers[question.key] || ''}
-                        onChange={(event) => updateAnswer(question.key, event.target.value)}
-                      />
-                    )}
-
-                    {question.type === 'time' && (
-                      <input
-                        type="time"
-                        value={answers[question.key] || ''}
-                        onChange={(event) => updateAnswer(question.key, event.target.value)}
-                      />
-                    )}
-
-                    {question.type === 'number' && (
-                      <input
-                        type="number"
-                        min={question.min}
-                        max={question.max}
-                        step={question.step}
-                        value={answers[question.key] || ''}
-                        onChange={(event) => updateAnswer(question.key, event.target.value)}
-                        placeholder={question.placeholder || ''}
-                      />
-                    )}
-
-                    {question.type === 'select' && (
-                      <select
-                        value={answers[question.key] || ''}
-                        onChange={(event) => updateAnswer(question.key, event.target.value)}
-                      >
-                        <option value="">Escolhe uma opção</option>
-                        {question.options?.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {isFinalReview && (
-            <section className={styles.formPanel}>
-              <div className={styles.sectionIntro}>
-                <span className={styles.sectionNumber}>10</span>
-                <div>
-                  <h2>Quase a conhecer o Diogo…</h2>
-                  <p>Revisa o teu palpite antes de guardar.</p>
-                </div>
-              </div>
-
-              <div className={styles.summaryList}>
-                <div className={styles.summaryRow}><strong>Nome:</strong> {name}</div>
-                {allQuestions.map((question) => (
-                  <div key={question.key} className={styles.summaryRow}>
-                    <strong>{question.label}:</strong> {answers[question.key] || 'Sem resposta'}
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {status.type !== 'idle' && (
-            <div className={`${styles.alert} ${status.type === 'error' ? styles.error : styles.success}`}>
-              {status.message}
-            </div>
-          )}
-
-          <div className={styles.actions}>
-            {stepIndex > 0 && (
-              <button type="button" className={styles.secondaryButton} onClick={prevStep}>
-                Voltar
-              </button>
-            )}
-
-            {stepIndex === 0 && (
-              <button type="button" className={styles.primaryButton} onClick={nextStep} disabled={!name.trim() || nameCheckState.loading}>
-                {nameCheckState.loading ? 'A verificar...' : 'Começar a dar palpites'}
-              </button>
-            )}
-
-            {stepIndex > 0 && stepIndex < quizSections.length && (
-              <button type="button" className={styles.primaryButton} onClick={nextStep}>
-                Seguinte
-              </button>
-            )}
-
-            {isFinalReview && (
-              <button type="button" className={styles.primaryButton} onClick={submitQuiz} disabled={isSubmitting}>
-                {isSubmitting ? 'A guardar...' : 'Enviar palpite'}
-              </button>
-            )}
-          </div>
-        </main>
-
-        <footer className={styles.footer}>
-          <span>{answeredCount} respostas preenchidas</span>
-          <span>{Math.min(stepIndex + 1, quizSections.length + 1)}/{quizSections.length + 1}</span>
-        </footer>
+        <button
+          type="button"
+          className={`${styles.btn} ${styles.btnPrimary} ${styles.btnWide}`}
+          onClick={submit}
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? 'A guardar…' : 'Guardar o meu palpite'}
+        </button>
       </div>
     </div>
   );

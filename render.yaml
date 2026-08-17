@@ -1,22 +1,35 @@
+# Blueprint Render — Qui Diogo Baby Shower Quiz
+# Web Service Next.js gratuito + base de dados PostgreSQL gratuita.
+# Para usar: Dashboard Render → New → Blueprint → liga este repositório.
+# Docs: https://render.com/docs/blueprint-spec
+#
+# NOTA: a raiz deste repositório é a pasta qui-diogo/, por isso os comandos
+# abaixo NÃO levam prefixo `cd`. O render.yaml que existe na pasta-pai está
+# fora do repositório e o Render nunca o lê.
+
 services:
   - type: web
     name: qui-diogo
-    env: node
+    runtime: node
     plan: free
-    buildCommand: npm install && npm run migrate && npm run seed
+    region: frankfurt          # região mais próxima de Portugal
+    branch: master
+    buildCommand: npm install && npm run build && npm run migrate && npm run seed
     startCommand: npm run start
+    healthCheckPath: /api/health
+    autoDeploy: true
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: 3000
-      - fromDatabase:
+      # PORT é injetado automaticamente pelo Render — não o fixes aqui.
+      - key: DATABASE_URL
+        fromDatabase:
           name: qui-diogo-db
           property: connectionString
-        key: DATABASE_URL
 
 databases:
   - name: qui-diogo-db
-    databaseName: qui_diogo
-    user: postgres
     plan: free
+    databaseName: quidiogo
+    user: quidiogo
+    region: frankfurt

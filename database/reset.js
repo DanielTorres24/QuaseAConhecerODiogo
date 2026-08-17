@@ -2,8 +2,8 @@ const db = require('../database');
 
 async function resetData() {
   const queries = [
-    'DELETE FROM scores;',
-    'DELETE FROM players;',
+    'DELETE FROM responses;',
+    'DELETE FROM participants;',
   ];
 
   for (const query of queries) {

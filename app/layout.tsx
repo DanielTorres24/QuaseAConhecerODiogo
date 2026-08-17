@@ -1,15 +1,19 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Quicksand, Dancing_Script } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Quicksand: arredondada e suave, aproxima-se do lettering do convite.
+const bodyFont = Quicksand({
+  variable: "--font-body",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+// Dancing Script: a manuscrita do "Diogo" / "Baby Shower" no convite.
+const scriptFont = Dancing_Script({
+  variable: "--font-script",
   subsets: ["latin"],
+  weight: ["400", "700"],
 });
 
 export const metadata: Metadata = {
@@ -17,9 +21,15 @@ export const metadata: Metadata = {
   description: "Questionário de palpites de baby shower para o Diogo.",
 };
 
+export const viewport = {
+  themeColor: "#f5fafe",
+  width: "device-width",
+  initialScale: 1,
+};
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="pt" className={`${geistSans.variable} ${geistMono.variable}`}>
+    <html lang="pt" className={`${bodyFont.variable} ${scriptFont.variable}`}>
       <body>{children}</body>
     </html>
   );

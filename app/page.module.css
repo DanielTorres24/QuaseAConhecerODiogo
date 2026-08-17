@@ -1,274 +1,597 @@
+/* ---------------------------------------------------------------
+   Estrutura da pagina
+   --------------------------------------------------------------- */
+
 .pageShell {
-  min-height: 100vh;
-  padding: 24px 16px 48px;
-  background:
-    linear-gradient(rgba(255, 248, 252, 0.8), rgba(250, 242, 255, 0.88)),
-    url('https://images.unsplash.com/photo-1516627145497-ae6968895b74?auto=format&fit=crop&w=1200&q=80') center/cover no-repeat;
+  position: relative;
+  min-height: 100dvh;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
+  padding: 14px 16px calc(28px + env(safe-area-inset-bottom));
 }
 
-.appCard {
-  width: min(100%, 760px);
-  background: rgba(255, 255, 255, 0.82);
-  backdrop-filter: blur(18px);
-  border: 1px solid rgba(120, 93, 151, 0.09);
-  box-shadow: 0 28px 60px rgba(132, 101, 169, 0.12);
-  border-radius: 28px;
-  padding: 20px;
+/* No convite estes ramos sangram para fora da pagina, por isso qualquer
+   recorte deixa uma aresta reta a meio do desenho. A mascara dissolve essa
+   aresta para dentro da pagina: em vez de cortado, fica desvanecido. */
+.pageShell::before,
+.pageShell::after {
+  content: '';
+  position: fixed;
+  background-repeat: no-repeat;
+  background-size: contain;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.75;
 }
 
-.header {
-  text-align: center;
-  padding: 8px 8px 20px;
+.pageShell::before {
+  top: 0;
+  left: 0;
+  width: 172px;
+  height: 150px;
+  background-image: url('/convite/flores-tl.png');
+  background-position: top left;
+  -webkit-mask-image: radial-gradient(125% 125% at 0% 0%, #000 52%, transparent 84%);
+  mask-image: radial-gradient(125% 125% at 0% 0%, #000 52%, transparent 84%);
 }
 
-.badge {
-  display: inline-block;
-  padding: 7px 12px;
-  border-radius: 999px;
-  background: rgba(201, 166, 236, 0.2);
-  color: #5d3b82;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+.pageShell::after {
+  right: 0;
+  bottom: 0;
+  width: 100px;
+  height: 265px;
+  background-image: url('/convite/flores-br.png');
+  background-position: bottom right;
+  -webkit-mask-image: radial-gradient(125% 125% at 100% 100%, #000 52%, transparent 84%);
+  mask-image: radial-gradient(125% 125% at 100% 100%, #000 52%, transparent 84%);
 }
 
-.header h1 {
-  margin-top: 16px;
-  font-size: clamp(2.2rem, 6vw, 4rem);
-  line-height: 1;
-  color: #2b1d3a;
+@media (min-width: 760px) {
+  .pageShell::before { width: 250px; height: 218px; }
+  .pageShell::after  { width: 145px; height: 385px; }
 }
 
-.header p {
-  margin-top: 14px;
-  font-size: 1rem;
-  line-height: 1.6;
-  color: #5d536f;
-}
+/* ---------------------------------------------------------------
+   Barra de progresso fixa no topo
+   --------------------------------------------------------------- */
 
-.progressWrap {
-  height: 10px;
-  background: #f0e7f8;
-  border-radius: 999px;
-  overflow: hidden;
-  margin-top: 20px;
-}
-
-.progressBar {
-  height: 100%;
-  background: linear-gradient(90deg, #d39ad8 0%, #b785ff 100%);
-  border-radius: inherit;
-}
-
-.formSection {
-  padding: 8px 4px 12px;
-}
-
-.formPanel {
-  background: rgba(255, 255, 255, 0.7);
-  border-radius: 22px;
-  padding: 18px 14px;
-  border: 1px solid rgba(105, 83, 118, 0.07);
-}
-
-.sectionIntro {
+.stickyBar {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  width: 100%;
+  max-width: 620px;
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 18px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--blue-pale);
+  box-shadow: var(--shadow-sm);
 }
 
-.sectionNumber {
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  background: linear-gradient(135deg, #f9d7ed 0%, #dfd1ff 100%);
-  color: #3a2d4e;
-  font-weight: 800;
+.progressTrack {
+  flex: 1;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--blue-pale);
+  overflow: hidden;
 }
 
-.sectionIntro h2 {
-  font-size: 1.5rem;
-  color: #2d1d42;
+.progressFill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--blue-soft), var(--blue-deep));
+  transition: width 280ms ease;
 }
 
-.sectionIntro p {
-  font-size: 0.92rem;
-  color: #5a4d6d;
+.progressLabel {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--blue-deep);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
-.questionList {
-  display: grid;
-  gap: 16px;
+/* ---------------------------------------------------------------
+   Cartao
+   --------------------------------------------------------------- */
+
+.card {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 620px;
+  background: var(--card);
+  border: 1px solid var(--blue-pale);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 22px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
 }
+
+.formIntro {
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.formIntro strong {
+  color: var(--navy);
+}
+
+/* ---------------------------------------------------------------
+   Cabecalho de seccao (boneco + titulo)
+   --------------------------------------------------------------- */
+
+.group {
+  display: block;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Caixa quadrada + contain: seja qual for a proporcao do boneco, cabe
+   inteiro e fica centrado. Nunca corta. */
+.sectionIcon {
+  flex: none;
+  width: 62px;
+  height: 62px;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+.sectionMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sectionName {
+  font-family: var(--font-script), cursive;
+  font-size: 26px;
+  line-height: 1.1;
+  color: var(--blue-deep);
+}
+
+.sectionSubtitle {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.dotted {
+  height: 1px;
+  border-top: 2px dotted var(--blue-soft);
+  margin: 12px 0 16px;
+}
+
+/* ---------------------------------------------------------------
+   Perguntas
+   --------------------------------------------------------------- */
 
 .questionBlock {
   display: grid;
   gap: 8px;
-}
-
-.questionLabel,
-.inputGroup span {
-  font-size: 0.96rem;
-  color: #3a2d4e;
-  font-weight: 600;
-}
-
-.inputGroup {
-  display: grid;
-  gap: 8px;
   margin-bottom: 18px;
 }
 
-.questionBlock input,
-.questionBlock textarea,
-.questionBlock select,
-.inputGroup input,
-.inputGroup select {
-  width: 100%;
-  border: 1px solid #e7dff3;
-  background: #fff;
-  color: #2d1d42;
-  padding: 14px 15px;
-  border-radius: 14px;
-  font: inherit;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+.questionBlock:last-child {
+  margin-bottom: 0;
 }
 
-.questionBlock input:focus,
-.questionBlock textarea:focus,
-.questionBlock select:focus,
-.inputGroup input:focus,
-.inputGroup select:focus {
-  outline: none;
-  border-color: #b184ea;
-  box-shadow: 0 0 0 4px rgba(177, 132, 234, 0.14);
-}
-
-.questionBlock textarea {
-  resize: vertical;
-}
-
-.alert {
-  margin-top: 18px;
-  border-radius: 14px;
-  padding: 12px 14px;
-  font-size: 0.96rem;
-}
-
-.alert.error {
-  background: rgba(255, 109, 109, 0.1);
-  border: 1px solid rgba(255, 109, 109, 0.2);
-  color: #a12a2a;
-}
-
-.alert.success {
-  background: rgba(91, 196, 122, 0.12);
-  border: 1px solid rgba(91, 196, 122, 0.2);
-  color: #245d3c;
-}
-
-.actions {
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  margin-top: 20px;
-}
-
-.primaryButton,
-.secondaryButton {
-  flex: 1;
-  border: none;
-  border-radius: 999px;
-  padding: 15px 18px;
+.questionLabel {
+  font-size: 15px;
   font-weight: 700;
-  font-size: 1rem;
+  line-height: 1.4;
+  color: var(--navy);
+  text-wrap: pretty;
+}
+
+.fieldLabel {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.field {
+  width: 100%;
+  min-height: 52px;
+  padding: 13px 15px;
+  border-radius: 14px;
+  border: 2px solid var(--blue-light);
+  background: #fff;
+  /* 16px evita o zoom automatico do Safari no iPhone ao focar o campo */
+  font-size: 16px;
+  color: var(--ink);
+  transition: border-color 140ms ease;
+}
+
+.field::placeholder {
+  color: #9db4cd;
+}
+
+.field:focus {
+  outline: none;
+  border-color: var(--blue-deep);
+}
+
+/* Seta propria, para o select nao herdar o aspecto do sistema */
+select.field {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 44px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9' viewBox='0 0 14 9'%3E%3Cpath d='M1 1l6 6 6-6' fill='none' stroke='%232f6bb0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 16px center;
   cursor: pointer;
 }
 
-.primaryButton {
-  background: linear-gradient(135deg, #c88de7 0%, #8d82ef 100%);
-  color: white;
-  box-shadow: 0 16px 28px rgba(142, 116, 220, 0.22);
+.textarea {
+  min-height: 128px;
+  resize: vertical;
+  line-height: 1.5;
 }
 
-.primaryButton:disabled {
+/* ---------------------------------------------------------------
+   Bloco de bonus
+   --------------------------------------------------------------- */
+
+.bonusBox {
+  padding: 16px;
+  border-radius: 16px;
+  border: 2px dashed var(--blue-soft);
+  background: var(--blue-mist);
+}
+
+.bonusIntro {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--blue-deep);
+  margin-bottom: 14px;
+}
+
+/* ---------------------------------------------------------------
+   Botoes
+   --------------------------------------------------------------- */
+
+.btn {
+  min-height: 52px;
+  padding: 14px 22px;
+  border-radius: 14px;
+  border: none;
+  font-size: 16px;
+  font-weight: 700;
+  transition: transform 140ms ease, box-shadow 140ms ease, background 140ms ease;
+}
+
+.btn:active {
+  transform: scale(0.985);
+}
+
+.btn:focus-visible {
+  outline: 3px solid var(--blue-soft);
+  outline-offset: 2px;
+}
+
+.btn:disabled {
   opacity: 0.55;
   cursor: not-allowed;
 }
 
-.secondaryButton {
-  background: #f3ebff;
-  color: #432c67;
+.btnPrimary {
+  background: linear-gradient(135deg, var(--blue) 0%, var(--blue-deep) 100%);
+  color: #fff;
+  box-shadow: 0 10px 22px rgba(47, 107, 176, 0.28);
 }
 
-.summaryList {
+.btnPrimary:hover:not(:disabled) {
+  box-shadow: 0 12px 26px rgba(47, 107, 176, 0.36);
+}
+
+.btnGhost {
+  background: transparent;
+  color: var(--blue-deep);
+}
+
+.btnGhost:hover {
+  background: rgba(47, 107, 176, 0.07);
+}
+
+.btnDanger {
+  background: #fff;
+  color: var(--danger);
+  border: 2px solid #f0cdca;
+}
+
+.btnDanger:hover:not(:disabled) {
+  background: #fdf0ef;
+}
+
+.btnWide {
+  width: 100%;
+}
+
+/* ---------------------------------------------------------------
+   Ecra inicial
+   --------------------------------------------------------------- */
+
+.hero {
+  text-align: center;
+  display: grid;
+  gap: 8px;
+}
+
+.heroBadge {
+  justify-self: center;
+  padding: 7px 18px;
+  border-radius: 999px;
+  background: var(--blue-pale);
+  border: 1px dashed var(--blue-soft);
+  color: var(--blue-deep);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.heroTitle {
+  font-family: var(--font-script), cursive;
+  font-size: 40px;
+  line-height: 1.05;
+  color: var(--navy);
+  font-weight: 700;
+}
+
+.heroText {
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+/* A largura vem inline, calculada da proporcao real de cada recorte;
+   a altura e comum, como se estivessem todos pendurados na mesma corda. */
+.clothesline {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 8px;
+  padding-top: 6px;
+  border-top: 2px dotted var(--blue-soft);
+  margin-top: 6px;
+}
+
+.clotheslineItem {
+  flex: none;
+  height: 78px;
+  background-repeat: no-repeat;
+  background-position: bottom center;
+  background-size: contain;
+}
+
+/* ---------------------------------------------------------------
+   Ecra final
+   --------------------------------------------------------------- */
+
+.successCard {
+  composes: card;
+  text-align: center;
+  margin-top: 6vh;
+  gap: 14px;
+}
+
+.successTitle {
+  font-family: var(--font-script), cursive;
+  font-size: 36px;
+  line-height: 1.1;
+  color: var(--navy);
+}
+
+.successText {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+/* ---------------------------------------------------------------
+   Mensagens
+   --------------------------------------------------------------- */
+
+.error {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #fdf0ef;
+  border: 1px solid #f0cdca;
+  color: var(--danger);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.hint {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+/* ---------------------------------------------------------------
+   Estatisticas do ecra final
+
+   Uma so medida (contagem de palpites), portanto uma so cor e sem
+   legenda. O palpite da propria pessoa e destacado por cor E por
+   etiqueta, para que a identidade nunca dependa so da cor.
+   --------------------------------------------------------------- */
+
+.stats {
+  display: grid;
+  gap: 18px;
+  text-align: left;
+  margin-top: 4px;
+}
+
+.statsHero {
+  text-align: center;
+  font-size: 15px;
+  color: var(--muted);
+}
+
+/* O numero principal fica na sans do corpo, nao na manuscrita: os
+   algarismos do Dancing Script sao dificeis de ler a este tamanho. */
+.statsHero strong {
+  display: block;
+  font-size: 44px;
+  font-weight: 700;
+  line-height: 1.05;
+  color: var(--navy);
+}
+
+.statsLead {
+  text-align: center;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.tile {
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--blue-mist);
+  border: 1px solid var(--blue-pale);
+}
+
+.tileValue {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--navy);
+  line-height: 1.15;
+}
+
+.tileValue small {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.tileLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  line-height: 1.35;
+}
+
+.distribution {
   display: grid;
   gap: 10px;
 }
 
-.summaryRow {
-  background: #faf5ff;
-  border-radius: 12px;
-  padding: 10px 12px;
-  line-height: 1.5;
-  color: #3b2d4d;
-  word-break: break-word;
+.distributionTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--navy);
+  line-height: 1.35;
 }
 
-.summaryRow strong {
-  color: #2d1d42;
+.bars {
+  display: grid;
+  /* Folga entre marcas adjacentes, para nunca colarem uma na outra. */
+  gap: 10px;
+  list-style: none;
 }
 
-.footer {
+.barRow {
+  display: grid;
+  gap: 5px;
+}
+
+.barHead {
   display: flex;
-  justify-content: space-between;
-  color: #665a7b;
-  font-size: 0.82rem;
-  padding: 18px 8px 6px;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
 }
 
-.successCard {
-  width: min(100%, 680px);
-  background: rgba(255,255,255,0.8);
-  border-radius: 28px;
-  padding: 40px 24px;
-  text-align: center;
-  box-shadow: 0 20px 50px rgba(125, 98, 167, 0.12);
+.barLabel {
+  color: var(--ink);
+  font-weight: 600;
+  min-width: 0;
 }
 
-.successCard h1 {
-  margin-top: 12px;
-  font-size: clamp(2rem, 6vw, 3rem);
-  color: #2d1d42;
+.barValue {
+  margin-left: auto;
+  flex: none;
+  font-weight: 700;
+  color: var(--navy);
+  font-variant-numeric: tabular-nums;
 }
 
-.successCard p {
-  margin-top: 18px;
-  color: #514867;
-  line-height: 1.7;
+/* A contagem em bruto ao lado da percentagem: as percentagens arredondadas
+   nem sempre somam 100 e sem isto parece um erro. */
+.barCount {
+  font-weight: 600;
+  color: var(--muted);
 }
 
-.kicker {
-  font-size: 0.8rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
+.barBadge {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--navy);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: #7f5bb4;
+  white-space: nowrap;
 }
 
-@media (min-width: 700px) {
-  .appCard {
-    padding: 32px;
-  }
+.barTrack {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--blue-pale);
+  overflow: hidden;
+}
 
-  .formPanel {
-    padding: 26px 22px;
-  }
+/* Marca fina, encostada a linha de base, com a ponta arredondada. */
+.barFill {
+  height: 100%;
+  min-width: 3px;
+  border-radius: 0 5px 5px 0;
+  background: var(--chart-bar);
+  transition: width 420ms ease;
+}
+
+.barFillMine {
+  background: var(--chart-bar-mine);
+}
+
+/* Quando so existe uma resposta, uma barra a 100% nao diz nada:
+   vale mais a frase. */
+.unanimous {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--blue-mist);
+  border: 1px solid var(--blue-pale);
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.unanimous strong {
+  color: var(--navy);
 }
