@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: qui-diogo
+    env: node
+    plan: free
+    buildCommand: npm install && npm run migrate && npm run seed
+    startCommand: npm run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - fromDatabase:
+          name: qui-diogo-db
+          property: connectionString
+        key: DATABASE_URL
+
+databases:
+  - name: qui-diogo-db
+    databaseName: qui_diogo
+    user: postgres
+    plan: free
