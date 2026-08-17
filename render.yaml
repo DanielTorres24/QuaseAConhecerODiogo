@@ -19,7 +19,11 @@ services:
 
     # O build não toca na base de dados: só instala e compila. Assim um
     # problema de ligação nunca faz falhar a compilação.
-    buildCommand: npm install && npm run build
+    #
+    # --include=dev é obrigatório: com NODE_ENV=production (definido abaixo)
+    # o npm pode omitir as devDependencies, e é lá que estão o typescript e
+    # os @types. Sem eles o "next build" falha na verificação de tipos.
+    buildCommand: npm install --include=dev && npm run build
 
     # As migrações correm ao arrancar. São idempotentes (CREATE ... IF NOT
     # EXISTS), por isso podem correr em todos os arranques sem estragar nada.
