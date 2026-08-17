@@ -58,17 +58,21 @@ Both construct their own `pg.Pool` from `DATABASE_URL` and enable `ssl: { reject
 
 **The quiz is data, not code.** `lib/quiz.ts` holds `quizSections` (7 sections, discriminated-union `QuestionDefinition` types: text/textarea/date/time/number/select) flattened into `allQuestions`. Adding or changing a question means editing that array and nothing else: `app/api/submit/route.ts` iterates `allQuestions` to build one `responses` row per question, denormalizing the question label into `question_text`. The seeded `questions` table is not read by the app.
 
-Two derived lists drive the flow, both computed from a `core?: boolean` flag on each question:
-- `coreQuestions` — the main path everyone walks (currently 18)
-- `bonusQuestions` — offered only after the core path, on the "gate" screen (currently 9)
+`allQuestions` is the whole flow — every one of the 27 is asked, in order, with no split and no opt-in step. An earlier `core`/`bonus` division existed and was removed; don't reintroduce a "want more questions?" gate.
 
 The list was deliberately cut from 51 questions to 27: near-duplicate "parecenças" (eyes/nose/mouth/hair each asked separately) and the long tail of "quem vai…" questions were removed because the flow read as heavy on a phone. Resist re-adding questions one at a time.
 
 Marking a question `core: true` moves it between the two; nothing else needs touching. The section a question belongs to still supplies its header and illustration, even though sections are no longer rendered as pages.
 
-**The quiz UI is a single scrolling form** (`app/page.tsx`) with three phases: `name → quiz → done`. All 18 core questions are on the page at once, grouped by section, with the bonus block behind an opt-in button at the bottom. Select questions use native `<select>` — on a phone that opens the OS picker and keeps the page short, which pill buttons could not (18 questions × 4–5 options is an unusable scroll).
+**The quiz UI asks one question per screen** (`app/page.tsx`), phases `name → quiz → done`, walking `allQuestions` from 1/27 to 27/27 and submitting straight from the last one. Nothing interrupts the sequence.
 
-This replaced an earlier one-question-per-screen wizard with auto-advance. Both were built and reviewed against the real thing; the single page won because the step-by-step version felt slow. Don't reintroduce per-question transitions without asking.
+With a screen to itself, each choice question gets large tappable buttons rather than a native `<select>`; tapping an option records it **and advances in the same gesture, with no timer** — an earlier version used a ~260 ms pause and it read as sluggish. The exception is "Outra", which must stay put so the free-text field can be filled.
+
+`avancar()` takes the answers as arguments because the tap that answers is the same tap that advances, and React state has not been applied yet at that point — reading from state there would submit the previous answer on the final question.
+
+The nav is two fixed rows (primary full-width on top, Voltar/Saltar under it) rather than one flex row. On a 320 px screen the single row wrapped and left the primary button stranded mid-line.
+
+This layout has flipped twice on request — one-per-screen, then a single scrolling form, now one-per-screen again. Confirm before changing it a fourth time.
 
 **"Outra" opens a free-text field.** Any select option matching `/^outr[ao]$/i` (`isOtherOption`) reveals an input instead of advancing. On submit, `resolveAnswer` stores the typed text in place of the word "Outra", so the admin sees the real answer; if nothing is typed, the literal option is stored.
 
@@ -81,9 +85,19 @@ This replaced an earlier one-question-per-screen wizard with auto-advance. Both 
 - A question with only one distinct answer renders as a sentence, not a lone 100% bar.
 - The hero figure uses the body sans, not the script face — Dancing Script numerals are hard to read at that size.
 
-**Styling follows `Convite.jpeg`.** The palette lives in `app/globals.css` as CSS custom properties sampled from the invite; `Dancing_Script` is the display face (the invite's handwriting) and `Quicksand` the body. The illustrations in `public/convite/` are produced by `tools/recortar-convite.py`, which runs in two passes: it first turns the whole invite into `convite.png` with the off-white paper removed to real transparency (a luminance ramp — without it the cut-outs render as visible grey boxes), then crops each figure from *that* and **trims to the alpha bounding box**. The trim is what guarantees nothing renders clipped; the generous boxes at the top of the file only need to avoid catching a neighbour or the invite's dashed rules.
+**Two typefaces, with a rule.** `Dancing_Script` (`--font-script`) is for titles only; `Quicksand` (`--font-body`) carries everything else, including every number. Script numerals are unreadable at a glance, so the stats hero and all figures stay on the body face.
 
-Because trimming changes each PNG's aspect ratio, the sizes in `page.module.css` and the `CLOTHESLINE` widths in `page.tsx` are derived from the output dimensions the script prints. Re-run the script and update those numbers together, or use a square box with `background-size: contain` (as `.sectionIcon` does) which cannot clip whatever the ratio.
+**Everything is fluid — there is no fixed-px layout.** `app/globals.css` defines a `clamp()` scale (`--text-xs` … `--text-2xl`, `--space-2` … `--space-6`, `--radius`, `--tap`) that interpolates between a 320 px phone and a tablet, and every rule in the app sizes itself from those tokens. That is why there is almost no media query: adding one usually means a token is wrong. Two floors are deliberate and should not be lowered — `--text-xs` at ~12.6 px (below that the stat-tile captions stop being comfortable) and `font-size: max(16px, …)` on `.field` (anything smaller makes Safari on iPhone zoom on focus). `* { min-width: 0 }` in the reset keeps a long word from widening the page.
+
+Verify changes at 320/360/390/430/768 and assert `documentElement.scrollWidth === clientWidth` at each; horizontal overflow is the failure this layout is built to avoid.
+
+**The illustrations come from `icons.png`** (project root, one sheet of five objects on a dark background) via `tools/recortar-icones.py`, which writes `public/icons/`. Background removal grows a region inward from the tile borders, accepting the next pixel while the colour barely changes — it follows the smooth gradient and stops at the silhouette, and dark areas *inside* an object survive because they never touch the border. A plain luminance cut fails here (the cap and sneakers are navy, like the background) and so does GrabCut (it eats the bunny's bow tie and misses the bodysuit entirely).
+
+`TOLERANCIA` is per object because the safe value differs wildly: sweep it and the background fraction holds steady, then jumps — the jump is the fill bursting into the object. Each value sits just below its own jump. The bunny needs 18 (beige fur against a warm glow) and the cap only 10 (navy on navy); the rest take 26. If a cut-out looks nibbled, lower its tolerance; if a dark halo survives, raise it.
+
+Aspect ratios matter downstream: `BONECOS` in `page.tsx` passes each PNG's width/height as a `--ratio` custom property and the CSS derives width from a fluid height, so nothing is ever stretched or clipped. Re-running the script can change those dimensions — update the ratios from the sizes it prints. `.sectionIcon` sidesteps this with a square box and `background-size: contain`, which cannot clip at any ratio.
+
+The page background (watercolour gradients plus scattered hearts) is pure CSS, so it costs no requests and scales to any screen.
 
 `tools/palpites-demo.py` fills the database with nine fictional guesses so the stats screen can be seen with data. Development only — clear it with `npm run reset` before the party.
 

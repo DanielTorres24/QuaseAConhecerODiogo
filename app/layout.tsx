@@ -2,14 +2,14 @@ import type { Metadata } from "next";
 import { Quicksand, Dancing_Script } from "next/font/google";
 import "./globals.css";
 
-// Quicksand: arredondada e suave, aproxima-se do lettering do convite.
+// Quicksand: arredondada e suave, boa a tamanhos pequenos no telemovel.
 const bodyFont = Quicksand({
   variable: "--font-body",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
 });
 
-// Dancing Script: a manuscrita do "Diogo" / "Baby Shower" no convite.
+// Dancing Script: manuscrita, so para titulos — nunca para numeros.
 const scriptFont = Dancing_Script({
   variable: "--font-script",
   subsets: ["latin"],

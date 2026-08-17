@@ -1,72 +1,59 @@
 "use client";
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import styles from './page.module.css';
 import StatsPanel from './StatsPanel';
 import {
   allQuestions,
-  bonusQuestions,
-  coreQuestions,
   getInitialAnswerState,
+  getSection,
   isOtherOption,
-  quizSections,
   resolveAnswer,
   type QuestionDefinition,
-  type QuizSection,
 } from '@/lib/quiz';
 
 type Phase = 'name' | 'quiz' | 'done';
 
 /**
- * Larguras proporcionais ao recorte real de cada boneco, para que a altura
- * seja comum e nenhum apareca esticado ou cortado.
+ * Fila de bonecos do cabecalho. O `ratio` e a proporcao real de cada PNG
+ * (largura/altura): o CSS fixa uma altura fluida e deriva a largura daqui,
+ * por isso nenhum aparece esticado nem cortado, em qualquer ecra.
  */
-const CLOTHESLINE = [
-  { src: '/convite/sapatinhos.png', width: 70 },
-  { src: '/convite/gorro.png', width: 52 },
-  { src: '/convite/body.png', width: 68 },
-  { src: '/convite/coelho.png', width: 45 },
+const BONECOS = [
+  { src: '/icons/sapatilhas.png', ratio: 357 / 360, alt: 'Sapatilhas de bebé' },
+  { src: '/icons/bone.png', ratio: 360 / 284, alt: 'Boné de ganga' },
+  { src: '/icons/body.png', ratio: 326 / 360, alt: 'Body com uma estrela' },
+  { src: '/icons/laco.png', ratio: 360 / 197, alt: 'Laço azul' },
+  { src: '/icons/coelho.png', ratio: 273 / 360, alt: 'Coelho de peluche' },
 ];
 
-function Clothesline() {
+function Bonecos() {
   return (
     <div className={styles.clothesline}>
-      {CLOTHESLINE.map((item) => (
+      {BONECOS.map((item) => (
         <span
           key={item.src}
+          role="img"
+          aria-label={item.alt}
           className={styles.clotheslineItem}
-          style={{ backgroundImage: `url(${item.src})`, width: item.width }}
+          style={{ backgroundImage: `url(${item.src})`, ['--ratio' as string]: item.ratio }}
         />
       ))}
     </div>
   );
 }
 
-/** Agrupa uma lista de perguntas pelas seccoes a que pertencem. */
-function groupBySection(questions: QuestionDefinition[]) {
-  return quizSections
-    .map((section) => ({
-      section,
-      questions: questions.filter((question) => question.section === section.id),
-    }))
-    .filter((group) => group.questions.length > 0);
-}
-
 export default function HomePage() {
   const [phase, setPhase] = useState<Phase>('name');
+  const [index, setIndex] = useState(0);
   const [name, setName] = useState('');
   const [answers, setAnswers] = useState<Record<string, string>>(getInitialAnswerState);
   const [otherTexts, setOtherTexts] = useState<Record<string, string>>({});
-  const [showBonus, setShowBonus] = useState(false);
   const [error, setError] = useState('');
   const [isChecking, setIsChecking] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const coreGroups = useMemo(() => groupBySection(coreQuestions), []);
-  const bonusGroups = useMemo(() => groupBySection(bonusQuestions), []);
-
-  const answeredCore = coreQuestions.filter((question) => (answers[question.key] ?? '').trim() !== '').length;
-  const progress = (answeredCore / coreQuestions.length) * 100;
+  const total = allQuestions.length;
 
   const setAnswer = (key: string, value: string) => {
     setAnswers((previous) => ({ ...previous, [key]: value }));
@@ -100,16 +87,17 @@ export default function HomePage() {
 
     setIsChecking(false);
     setPhase('quiz');
+    setIndex(0);
   };
 
-  const submit = async () => {
+  const submit = async (finalAnswers = answers, finalOthers = otherTexts) => {
     setIsSubmitting(true);
     setError('');
 
     const payload = Object.fromEntries(
       allQuestions.map((question) => [
         question.key,
-        resolveAnswer(answers[question.key] ?? '', otherTexts[question.key] ?? ''),
+        resolveAnswer(finalAnswers[question.key] ?? '', finalOthers[question.key] ?? ''),
       ]),
     );
 
@@ -137,94 +125,34 @@ export default function HomePage() {
     setIsSubmitting(false);
   };
 
-  /** Uma pergunta: etiqueta + campo. Sem transicoes, tudo visivel de uma vez. */
-  const renderQuestion = (question: QuestionDefinition) => {
-    const value = answers[question.key] ?? '';
-    const showOther = question.type === 'select' && isOtherOption(value);
-    const fieldId = `q-${question.key}`;
+  /**
+   * Avanca para a pergunta seguinte, ou submete se esta for a ultima.
+   * Aceita as respostas em mao porque quem escolhe uma opcao avanca no mesmo
+   * gesto, antes de o estado ter sido aplicado.
+   */
+  const avancar = (currentAnswers = answers, currentOthers = otherTexts) => {
+    setError('');
 
-    return (
-      <div className={styles.questionBlock} key={question.key}>
-        <label className={styles.questionLabel} htmlFor={fieldId}>
-          {question.label}
-        </label>
+    if (index + 1 < total) {
+      setIndex(index + 1);
+      window.scrollTo({ top: 0 });
+      return;
+    }
 
-        {question.type === 'select' && (
-          <select
-            id={fieldId}
-            className={styles.field}
-            value={value}
-            onChange={(event) => setAnswer(question.key, event.target.value)}
-          >
-            <option value="">Escolhe uma opção…</option>
-            {question.options.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-        )}
-
-        {showOther && (
-          <input
-            className={styles.field}
-            value={otherTexts[question.key] ?? ''}
-            onChange={(event) =>
-              setOtherTexts((previous) => ({ ...previous, [question.key]: event.target.value }))
-            }
-            placeholder="Então diz-nos qual…"
-            aria-label="Escreve a tua resposta"
-          />
-        )}
-
-        {(question.type === 'text' ||
-          question.type === 'date' ||
-          question.type === 'time' ||
-          question.type === 'number') && (
-          <input
-            id={fieldId}
-            className={styles.field}
-            type={question.type}
-            value={value}
-            onChange={(event) => setAnswer(question.key, event.target.value)}
-            placeholder={
-              question.type === 'text' || question.type === 'number' ? question.placeholder : undefined
-            }
-            min={question.type === 'number' ? question.min : undefined}
-            max={question.type === 'number' ? question.max : undefined}
-            step={question.type === 'number' ? question.step : undefined}
-            inputMode={question.type === 'number' ? 'decimal' : undefined}
-          />
-        )}
-
-        {question.type === 'textarea' && (
-          <textarea
-            id={fieldId}
-            className={`${styles.field} ${styles.textarea}`}
-            value={value}
-            onChange={(event) => setAnswer(question.key, event.target.value)}
-            placeholder={question.placeholder}
-          />
-        )}
-      </div>
-    );
+    void submit(currentAnswers, currentOthers);
   };
 
-  const renderGroup = (group: { section: QuizSection; questions: QuestionDefinition[] }) => (
-    <section className={styles.group} key={group.section.id}>
-      <div className={styles.sectionHead}>
-        <span className={styles.sectionIcon} style={{ backgroundImage: `url(${group.section.icon})` }} />
-        <div className={styles.sectionMeta}>
-          <span className={styles.sectionName}>{group.section.title}</span>
-          <span className={styles.sectionSubtitle}>{group.section.subtitle}</span>
-        </div>
-      </div>
+  const recuar = () => {
+    setError('');
 
-      <div className={styles.dotted} />
+    if (index > 0) {
+      setIndex(index - 1);
+      window.scrollTo({ top: 0 });
+      return;
+    }
 
-      {group.questions.map(renderQuestion)}
-    </section>
-  );
+    setPhase('name');
+  };
 
   /* ------------------------------------------------------------------ */
   /* Ecra final                                                          */
@@ -241,7 +169,7 @@ export default function HomePage() {
     return (
       <div className={styles.pageShell}>
         <div className={styles.successCard}>
-          <Clothesline />
+          <Bonecos />
           <h1 className={styles.successTitle}>Palpite registado! 🔮</h1>
           <p className={styles.successText}>
             Obrigado por ajudares a prever o Diogo! Agora só falta esperar para descobrir quem é
@@ -269,7 +197,7 @@ export default function HomePage() {
               Data, peso, parecenças, feitio e muito mais. Deixa o teu palpite e vamos descobrir
               quem conhece melhor o Diogo antes de ele chegar.
             </p>
-            <Clothesline />
+            <Bonecos />
           </div>
 
           <div className={styles.questionBlock}>
@@ -305,7 +233,7 @@ export default function HomePage() {
           </button>
 
           <p className={styles.hint}>
-            São {coreQuestions.length} perguntas e podes deixar em branco as que quiseres.
+            São {total} perguntas, uma de cada vez. Podes saltar as que não souberes.
           </p>
         </div>
       </div>
@@ -313,57 +241,156 @@ export default function HomePage() {
   }
 
   /* ------------------------------------------------------------------ */
-  /* Todas as perguntas numa so pagina                                   */
+  /* Uma pergunta de cada vez, da primeira a ultima                      */
   /* ------------------------------------------------------------------ */
+
+  const question: QuestionDefinition = allQuestions[index];
+  const section = getSection(question.section);
+  const value = answers[question.key] ?? '';
+  const showOther = question.type === 'select' && isOtherOption(value);
+  const hasAnswer = value.trim() !== '';
+  const isLast = index === total - 1;
+  const fieldId = `q-${question.key}`;
+
+  /** Escolher uma opcao responde e avanca no mesmo gesto, sem pausa. */
+  const escolher = (option: string) => {
+    const proximas = { ...answers, [question.key]: option };
+    setAnswers(proximas);
+
+    // "Outra" abre um campo de texto: fica no ecra a espera do que escreverem.
+    if (isOtherOption(option)) return;
+
+    avancar(proximas, otherTexts);
+  };
 
   return (
     <div className={styles.pageShell}>
       <div className={styles.stickyBar}>
         <div className={styles.progressTrack}>
-          <div className={styles.progressFill} style={{ width: `${progress}%` }} />
+          <div className={styles.progressFill} style={{ width: `${((index + 1) / total) * 100}%` }} />
         </div>
         <span className={styles.progressLabel}>
-          {answeredCore}/{coreQuestions.length}
+          {index + 1}/{total}
         </span>
       </div>
 
       <div className={styles.card}>
-        <p className={styles.formIntro}>
-          Olá, <strong>{name.trim()}</strong>! Responde ao teu ritmo — o que não souberes, deixa em
-          branco.
-        </p>
+        {section && (
+          <div className={styles.sectionHead}>
+            <span className={styles.sectionIcon} style={{ backgroundImage: `url(${section.icon})` }} />
+            <div className={styles.sectionMeta}>
+              <span className={styles.sectionName}>{section.title}</span>
+              <span className={styles.sectionSubtitle}>{section.subtitle}</span>
+            </div>
+          </div>
+        )}
 
-        {coreGroups.map(renderGroup)}
+        <div className={styles.dotted} />
 
-        <div className={styles.bonusBox}>
-          {showBonus ? (
-            <>
-              <p className={styles.bonusIntro}>
-                Boa! Mais {bonusQuestions.length} para quem está mesmo inspirado. 👇
-              </p>
-              {bonusGroups.map(renderGroup)}
-            </>
-          ) : (
-            <button
-              type="button"
-              className={`${styles.btn} ${styles.btnGhost} ${styles.btnWide}`}
-              onClick={() => setShowBonus(true)}
-            >
-              + Quero {bonusQuestions.length} perguntas extra (opcional)
-            </button>
-          )}
-        </div>
+        <h1 className={styles.questionTitle} id={`${fieldId}-label`}>
+          {question.label}
+        </h1>
+
+        {question.type === 'select' && (
+          <div className={styles.options} role="group" aria-labelledby={`${fieldId}-label`}>
+            {question.options.map((option) => (
+              <button
+                key={option}
+                type="button"
+                className={`${styles.option} ${value === option ? styles.optionSelected : ''}`}
+                aria-pressed={value === option}
+                onClick={() => escolher(option)}
+              >
+                <span className={styles.bullet} />
+                <span>{option}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {showOther && (
+          <div className={styles.otherBox}>
+            <span className={styles.otherHint}>Boa — então diz-nos qual 👇</span>
+            <input
+              className={styles.field}
+              value={otherTexts[question.key] ?? ''}
+              onChange={(event) =>
+                setOtherTexts((previous) => ({ ...previous, [question.key]: event.target.value }))
+              }
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') avancar();
+              }}
+              placeholder="Escreve aqui"
+              aria-label="Escreve a tua resposta"
+              autoFocus
+              enterKeyHint={isLast ? 'done' : 'next'}
+            />
+          </div>
+        )}
+
+        {(question.type === 'text' ||
+          question.type === 'date' ||
+          question.type === 'time' ||
+          question.type === 'number') && (
+          <input
+            id={fieldId}
+            className={styles.field}
+            type={question.type}
+            value={value}
+            onChange={(event) => setAnswer(question.key, event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') avancar();
+            }}
+            placeholder={
+              question.type === 'text' || question.type === 'number' ? question.placeholder : undefined
+            }
+            min={question.type === 'number' ? question.min : undefined}
+            max={question.type === 'number' ? question.max : undefined}
+            step={question.type === 'number' ? question.step : undefined}
+            inputMode={question.type === 'number' ? 'decimal' : undefined}
+            enterKeyHint={isLast ? 'done' : 'next'}
+            autoFocus
+          />
+        )}
+
+        {question.type === 'textarea' && (
+          <textarea
+            id={fieldId}
+            className={`${styles.field} ${styles.textarea}`}
+            value={value}
+            onChange={(event) => setAnswer(question.key, event.target.value)}
+            placeholder={question.placeholder}
+          />
+        )}
 
         {error && <p className={styles.error}>{error}</p>}
 
-        <button
-          type="button"
-          className={`${styles.btn} ${styles.btnPrimary} ${styles.btnWide}`}
-          onClick={submit}
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? 'A guardar…' : 'Guardar o meu palpite'}
-        </button>
+{/* Accao principal em cima e a toda a largura; as secundarias por baixo.
+            Assim o botao que interessa nunca fica encavalitado num ecra estreito. */}
+        <div className={styles.nav}>
+          {(hasAnswer || question.type !== 'select') && (
+            <button
+              type="button"
+              className={`${styles.btn} ${styles.btnPrimary} ${styles.btnWide}`}
+              onClick={() => avancar()}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'A guardar…' : isLast ? 'Terminar' : 'Continuar'}
+            </button>
+          )}
+
+          <div className={styles.navSecondary}>
+            <button type="button" className={`${styles.btn} ${styles.btnGhost}`} onClick={recuar}>
+              ← Voltar
+            </button>
+
+            {!hasAnswer && !isSubmitting && (
+              <button type="button" className={`${styles.btn} ${styles.btnGhost}`} onClick={() => avancar()}>
+                {isLast ? 'Saltar e terminar' : 'Saltar'}
+              </button>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
