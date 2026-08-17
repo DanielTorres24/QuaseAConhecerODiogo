@@ -115,6 +115,8 @@ This is deliberately stronger than it was: the original token was `base64(userna
 
 Render reads `render.yaml` from the repository root — that is **this directory's** `render.yaml`, not the parent's. It provisions a free web service plus a free Postgres, injecting `DATABASE_URL` from the database.
 
+**`.npmrc` pins `include=dev`, and it must stay.** The service runs with `NODE_ENV=production`, which makes `npm install` omit devDependencies — and `typescript` plus `@types/*` live there, so `next build` died with *"It looks like you're trying to use TypeScript but do not have the required package(s) installed"*. The tell in the log is the package count: **39 installed instead of ~396**. It lives in `.npmrc` rather than only in the `buildCommand` because a service keeps whatever build command it was created with (see below), so a fix that depends on the command being re-read does not reach it.
+
 **`render.yaml` only applies to services created as a Blueprint.** A service created by hand through "New → Web Service" keeps whatever is typed in the dashboard and ignores this file entirely — which is how a deploy once ran `npm install; npm run build` with no migrations. If the dashboard and this file disagree, the dashboard is what ran.
 
 The split of work is deliberate:
