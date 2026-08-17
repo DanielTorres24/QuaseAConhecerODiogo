@@ -2,8 +2,8 @@
   min-height: 100vh;
   padding: 24px 16px 48px;
   background:
-    radial-gradient(circle at top, rgba(255, 214, 225, 0.6), transparent 30%),
-    linear-gradient(180deg, #fff8fb 0%, #f8f2ff 35%, #fffaf3 100%);
+    linear-gradient(rgba(255, 248, 252, 0.8), rgba(250, 242, 255, 0.88)),
+    url('https://images.unsplash.com/photo-1516627145497-ae6968895b74?auto=format&fit=crop&w=1200&q=80') center/cover no-repeat;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -11,7 +11,7 @@
 
 .appCard {
   width: min(100%, 760px);
-  background: rgba(255, 255, 255, 0.75);
+  background: rgba(255, 255, 255, 0.82);
   backdrop-filter: blur(18px);
   border: 1px solid rgba(120, 93, 151, 0.09);
   box-shadow: 0 28px 60px rgba(132, 101, 169, 0.12);

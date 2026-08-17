@@ -146,18 +146,6 @@ export default function HomePage() {
                 />
               </label>
 
-              <label className={styles.inputGroup}>
-                <span>Quem és para o Diogo?</span>
-                <select value={relationship} onChange={(event) => setRelationship(event.target.value)}>
-                  <option value="">Selecciona uma opção</option>
-                  <option value="Família">Família</option>
-                  <option value="Amigo/a da mãe">Amigo/a da mãe</option>
-                  <option value="Amigo/a do pai">Amigo/a do pai</option>
-                  <option value="Colega">Colega</option>
-                  <option value="Outro">Outro</option>
-                </select>
-              </label>
-
               {nameCheckState.available === false && (
                 <div className={`${styles.alert} ${styles.error}`}>Este nome já foi usado. Escolha outro.</div>
               )}
@@ -281,7 +269,7 @@ export default function HomePage() {
 
             {stepIndex === 0 && (
               <button type="button" className={styles.primaryButton} onClick={nextStep} disabled={!name.trim() || nameCheckState.loading}>
-                {nameCheckState.loading ? 'A verificar...' : 'Começar o quiz'}
+                {nameCheckState.loading ? 'A verificar...' : 'Começar a dar palpites'}
               </button>
             )}
 

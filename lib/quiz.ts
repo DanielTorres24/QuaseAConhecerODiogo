@@ -56,7 +56,7 @@ export const quizSections: QuizSection[] = [
   {
     id: 'about',
     title: 'Sobre ti',
-    subtitle: 'Quem és para o Diogo?',
+    subtitle: 'Diz-nos quem estás a tentar surpreender.',
     questions: [
       {
         key: 'relationship',
