@@ -123,6 +123,10 @@ The split of work is deliberate:
 
 `npm run seed` is not run on Render: the only seed file is a documented no-op, since questions live in `lib/quiz.ts`.
 
+**Diagnosing a broken deploy without the logs:** `GET /api/health` is deliberately database-free and always 200, because it is the `healthCheckPath` and the free Postgres sleeping must not kill the service. `GET /api/health?db=1` is the diagnostic — it returns `sem-configuracao`, `sem-tabelas` (Postgres `42P01`, meaning migrations never ran), `sem-ligacao`, or `ok` with row counts.
+
+That endpoint exists because of a real failure: the live site answered "Não foi possível verificar o nome" for every guest. The cause was that the tables did not exist, but it was invisible — `/api/check-name` had no `try/catch`, so the driver error escaped, Next returned an **empty** 500, `response.json()` threw in the browser, and the client fell into its generic network-error branch. Two rules came out of it: **every route that touches the database wraps it in `try/catch`** and returns JSON, and **the client checks `response.ok` and tolerates a non-JSON body** — otherwise a server fault is misreported to the user as their own connection problem.
+
 Auto-deploy on push to `master` needs the GitHub repository properly connected to Render. A build log saying *"It looks like we don't have access to your repo, but we'll try to clone it anyway"* means it is not — the clone still works for a public repo, but no webhook arrives, so pushes will not trigger anything.
 
 ## Known issues

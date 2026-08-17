@@ -18,11 +18,16 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
     return Response.json({ error: 'Identificador inválido.' }, { status: 400 });
   }
 
-  const result = await db.query('DELETE FROM participants WHERE id = $1;', [participantId]);
+  try {
+    const result = await db.query('DELETE FROM participants WHERE id = $1;', [participantId]);
 
-  if (!result.rowCount) {
-    return Response.json({ error: 'Participante não encontrado.' }, { status: 404 });
+    if (!result.rowCount) {
+      return Response.json({ error: 'Participante não encontrado.' }, { status: 404 });
+    }
+
+    return Response.json({ ok: true });
+  } catch (error) {
+    console.error('Admin delete error', error);
+    return Response.json({ error: 'Não foi possível remover este participante.' }, { status: 503 });
   }
-
-  return Response.json({ ok: true });
 }

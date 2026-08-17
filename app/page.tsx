@@ -72,7 +72,15 @@ export default function HomePage() {
 
     try {
       const response = await fetch(`/api/check-name?name=${encodeURIComponent(trimmed)}`);
-      const data = await response.json();
+      // O corpo pode nao ser JSON se o servidor rebentar; sem isto o erro
+      // real ficava escondido atras de "verifica a ligação".
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok || !data) {
+        setError(data?.error || 'O servidor não respondeu como devia. Avisa quem organiza a festa.');
+        setIsChecking(false);
+        return;
+      }
 
       if (!data.available) {
         setError(data.error || 'Este nome já foi usado. Escolhe outro (ou acrescenta o apelido).');
@@ -80,7 +88,7 @@ export default function HomePage() {
         return;
       }
     } catch {
-      setError('Não foi possível verificar o nome. Verifica a ligação e tenta outra vez.');
+      setError('Não foi possível ligar ao servidor. Verifica a ligação e tenta outra vez.');
       setIsChecking(false);
       return;
     }
@@ -108,10 +116,10 @@ export default function HomePage() {
         body: JSON.stringify({ name, answers: payload }),
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => null);
 
-      if (!response.ok) {
-        setError(data.error || 'O palpite não pôde ser guardado.');
+      if (!response.ok || !data) {
+        setError(data?.error || 'O palpite não pôde ser guardado. Avisa quem organiza a festa.');
         setIsSubmitting(false);
         return;
       }

@@ -7,6 +7,15 @@ const unauthorized = () => Response.json({ error: 'Não autorizado.' }, { status
 export async function GET(request: NextRequest) {
   if (!isAuthorizedRequest(request)) return unauthorized();
 
+  try {
+    return await listarParticipantes();
+  } catch (error) {
+    console.error('Admin participants error', error);
+    return Response.json({ error: 'Não foi possível carregar os participantes.' }, { status: 503 });
+  }
+}
+
+async function listarParticipantes() {
   const participantsResult = await db.query(
     `SELECT id, name, relationship, created_at AS "createdAt"
      FROM participants
@@ -48,7 +57,11 @@ export async function GET(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   if (!isAuthorizedRequest(request)) return unauthorized();
 
-  const result = await db.query('DELETE FROM participants;');
-
-  return Response.json({ ok: true, deleted: result.rowCount ?? 0 });
+  try {
+    const result = await db.query('DELETE FROM participants;');
+    return Response.json({ ok: true, deleted: result.rowCount ?? 0 });
+  } catch (error) {
+    console.error('Admin delete-all error', error);
+    return Response.json({ error: 'Não foi possível apagar os registos.' }, { status: 503 });
+  }
 }
