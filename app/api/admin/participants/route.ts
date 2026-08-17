@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/db';
+import { db } from '@/lib/db';
 
 export async function GET(request: NextRequest) {
   const auth = request.headers.get('authorization');
@@ -13,10 +13,35 @@ export async function GET(request: NextRequest) {
     return Response.json({ error: 'Token inválido.' }, { status: 401 });
   }
 
-  const participants = await prisma.participant.findMany({
-    orderBy: { createdAt: 'desc' },
-    include: { responses: true },
-  });
+  const participantsResult = await db.query(
+    `SELECT id, name, relationship, created_at AS "createdAt"
+     FROM participants
+     ORDER BY created_at DESC;`,
+  );
 
-  return Response.json({ participants });
+  const participants = participantsResult.rows;
+  const participantIds = participants.map((participant) => participant.id);
+
+  const responsesResult = await db.query(
+    `SELECT participant_id AS "participantId", question_key AS "questionKey", question_text AS "questionText", answer
+     FROM responses
+     WHERE participant_id = ANY($1)
+     ORDER BY created_at ASC;`,
+    [participantIds],
+  );
+
+  const byParticipant = new Map<number, typeof responsesResult.rows>();
+  for (const row of responsesResult.rows) {
+    const key = Number(row.participantId);
+    const existing = byParticipant.get(key) ?? [];
+    existing.push(row);
+    byParticipant.set(key, existing);
+  }
+
+  const payload = participants.map((participant) => ({
+    ...participant,
+    responses: byParticipant.get(Number(participant.id)) ?? [],
+  }));
+
+  return Response.json({ participants: payload });
 }

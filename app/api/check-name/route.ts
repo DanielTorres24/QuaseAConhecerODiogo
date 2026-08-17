@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { prisma } from '@/lib/db';
+import { db } from '@/lib/db';
 import { normalizeParticipantName } from '@/lib/quiz';
 
 export async function GET(request: NextRequest) {
@@ -10,7 +10,8 @@ export async function GET(request: NextRequest) {
   }
 
   const nameKey = normalizeParticipantName(name);
-  const existing = await prisma.participant.findUnique({ where: { nameKey } });
+  const result = await db.query('SELECT id FROM participants WHERE name_key = $1 LIMIT 1;', [nameKey]);
+  const count = result.rowCount ?? 0;
 
-  return Response.json({ available: !existing, taken: Boolean(existing) });
+  return Response.json({ available: count === 0, taken: count > 0 });
 }

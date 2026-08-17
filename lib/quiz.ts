@@ -54,20 +54,6 @@ type QuizSection = {
 
 export const quizSections: QuizSection[] = [
   {
-    id: 'about',
-    title: 'Sobre ti',
-    subtitle: 'Diz-nos quem estás a tentar surpreender.',
-    questions: [
-      {
-        key: 'relationship',
-        section: 'about',
-        label: 'Quem és para o Diogo?',
-        type: 'select',
-        options: ['Família', 'Amigo/a da mãe', 'Amigo/a do pai', 'Colega', 'Outro'],
-      },
-    ],
-  },
-  {
     id: 'birth',
     title: 'Nascimento',
     subtitle: 'Os palpites sobre a chegada do Diogo.',

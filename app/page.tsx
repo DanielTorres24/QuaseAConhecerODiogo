@@ -7,7 +7,6 @@ import { allQuestions, getInitialAnswerState, quizSections } from '@/lib/quiz';
 export default function HomePage() {
   const [stepIndex, setStepIndex] = useState(0);
   const [name, setName] = useState('');
-  const [relationship, setRelationship] = useState('');
   const [answers, setAnswers] = useState<Record<string, string>>(() => getInitialAnswerState());
   const [status, setStatus] = useState<{ type: 'idle' | 'error' | 'success'; message?: string }>({ type: 'idle' });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -76,7 +75,7 @@ export default function HomePage() {
     const response = await fetch('/api/submit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, relationship, answers }),
+      body: JSON.stringify({ name, answers }),
     });
 
     const data = await response.json();
@@ -244,7 +243,6 @@ export default function HomePage() {
 
               <div className={styles.summaryList}>
                 <div className={styles.summaryRow}><strong>Nome:</strong> {name}</div>
-                <div className={styles.summaryRow}><strong>Quem és:</strong> {relationship || 'Não indicado'}</div>
                 {allQuestions.map((question) => (
                   <div key={question.key} className={styles.summaryRow}>
                     <strong>{question.label}:</strong> {answers[question.key] || 'Sem resposta'}
