@@ -1,0 +1,26 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Participant {
+  id           Int        @id @default(autoincrement())
+  name         String
+  nameKey      String     @unique
+  relationship String?
+  createdAt    DateTime   @default(now())
+  responses    Response[]
+}
+
+model Response {
+  id            Int        @id @default(autoincrement())
+  participantId Int
+  questionKey   String
+  questionText  String
+  answer        String
+  createdAt     DateTime   @default(now())
+  participant   Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+}
