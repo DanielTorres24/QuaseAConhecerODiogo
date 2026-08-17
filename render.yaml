@@ -1,11 +1,11 @@
 # Blueprint Render — Qui Diogo Baby Shower Quiz
 # Web Service Next.js gratuito + base de dados PostgreSQL gratuita.
-# Para usar: Dashboard Render → New → Blueprint → liga este repositório.
-# Docs: https://render.com/docs/blueprint-spec
 #
-# NOTA: a raiz deste repositório é a pasta qui-diogo/, por isso os comandos
-# abaixo NÃO levam prefixo `cd`. O render.yaml que existe na pasta-pai está
-# fora do repositório e o Render nunca o lê.
+# Para usar: Dashboard Render → New → Blueprint → liga este repositório.
+# Se o serviço tiver sido criado à mão ("New → Web Service"), o Render
+# IGNORA este ficheiro e usa o que estiver escrito no dashboard.
+#
+# Docs: https://render.com/docs/blueprint-spec
 
 services:
   - type: web
@@ -14,10 +14,19 @@ services:
     plan: free
     region: frankfurt          # região mais próxima de Portugal
     branch: master
-    buildCommand: npm install && npm run build && npm run migrate && npm run seed
-    startCommand: npm run start
-    healthCheckPath: /api/health
+    # Cada push para master volta a fazer build e publica sozinho.
     autoDeploy: true
+
+    # O build não toca na base de dados: só instala e compila. Assim um
+    # problema de ligação nunca faz falhar a compilação.
+    buildCommand: npm install && npm run build
+
+    # As migrações correm ao arrancar. São idempotentes (CREATE ... IF NOT
+    # EXISTS), por isso podem correr em todos os arranques sem estragar nada.
+    startCommand: npm run migrate && npm run start
+
+    healthCheckPath: /api/health
+
     envVars:
       - key: NODE_ENV
         value: production
@@ -26,6 +35,13 @@ services:
         fromDatabase:
           name: qui-diogo-db
           property: connectionString
+      # Sem isto, a password de administração fica a que está no código.
+      - key: ADMIN_USERNAME
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: ADMIN_SECRET
+        generateValue: true
 
 databases:
   - name: qui-diogo-db

@@ -90,14 +90,14 @@ export default function HomePage() {
     setIndex(0);
   };
 
-  const submit = async (finalAnswers = answers, finalOthers = otherTexts) => {
+  const submit = async () => {
     setIsSubmitting(true);
     setError('');
 
     const payload = Object.fromEntries(
       allQuestions.map((question) => [
         question.key,
-        resolveAnswer(finalAnswers[question.key] ?? '', finalOthers[question.key] ?? ''),
+        resolveAnswer(answers[question.key] ?? '', otherTexts[question.key] ?? ''),
       ]),
     );
 
@@ -125,12 +125,8 @@ export default function HomePage() {
     setIsSubmitting(false);
   };
 
-  /**
-   * Avanca para a pergunta seguinte, ou submete se esta for a ultima.
-   * Aceita as respostas em mao porque quem escolhe uma opcao avanca no mesmo
-   * gesto, antes de o estado ter sido aplicado.
-   */
-  const avancar = (currentAnswers = answers, currentOthers = otherTexts) => {
+  /** Avanca para a pergunta seguinte, ou submete se esta for a ultima. */
+  const avancar = () => {
     setError('');
 
     if (index + 1 < total) {
@@ -139,7 +135,7 @@ export default function HomePage() {
       return;
     }
 
-    void submit(currentAnswers, currentOthers);
+    void submit();
   };
 
   const recuar = () => {
@@ -252,15 +248,14 @@ export default function HomePage() {
   const isLast = index === total - 1;
   const fieldId = `q-${question.key}`;
 
-  /** Escolher uma opcao responde e avanca no mesmo gesto, sem pausa. */
+  /**
+   * Escolher uma opcao apenas responde. O avanco e sempre explicito, pelo
+   * botao Continuar, para que ninguem passe a pergunta seguinte por engano
+   * e possa mudar de ideias antes de seguir.
+   */
   const escolher = (option: string) => {
-    const proximas = { ...answers, [question.key]: option };
-    setAnswers(proximas);
-
-    // "Outra" abre um campo de texto: fica no ecra a espera do que escreverem.
-    if (isOtherOption(option)) return;
-
-    avancar(proximas, otherTexts);
+    setError('');
+    setAnswer(question.key, option);
   };
 
   return (
@@ -365,29 +360,25 @@ export default function HomePage() {
 
         {error && <p className={styles.error}>{error}</p>}
 
-{/* Accao principal em cima e a toda a largura; as secundarias por baixo.
-            Assim o botao que interessa nunca fica encavalitado num ecra estreito. */}
+{/* Accao principal a toda a largura e sempre no mesmo sitio: e o unico
+            caminho para a frente, e nao muda de lugar ao responder. */}
         <div className={styles.nav}>
-          {(hasAnswer || question.type !== 'select') && (
-            <button
-              type="button"
-              className={`${styles.btn} ${styles.btnPrimary} ${styles.btnWide}`}
-              onClick={() => avancar()}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? 'A guardar…' : isLast ? 'Terminar' : 'Continuar'}
-            </button>
-          )}
+          <button
+            type="button"
+            className={`${styles.btn} ${styles.btnPrimary} ${styles.btnWide}`}
+            onClick={avancar}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? 'A guardar…' : isLast ? 'Terminar' : 'Continuar'}
+          </button>
 
           <div className={styles.navSecondary}>
             <button type="button" className={`${styles.btn} ${styles.btnGhost}`} onClick={recuar}>
               ← Voltar
             </button>
 
-            {!hasAnswer && !isSubmitting && (
-              <button type="button" className={`${styles.btn} ${styles.btnGhost}`} onClick={() => avancar()}>
-                {isLast ? 'Saltar e terminar' : 'Saltar'}
-              </button>
+            {!hasAnswer && (
+              <span className={styles.hint}>Podes deixar em branco.</span>
             )}
           </div>
         </div>

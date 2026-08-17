@@ -32,7 +32,7 @@ npm run reset     # delete all participants/responses, keep the schema
 
 `run-local.bat` chains install → db:start → migrate → seed → dev and opens the browser. It is the intended entry point for manual testing.
 
-`migrate`/`seed`/`reset` and the app all throw at import time if `DATABASE_URL` is unset (see `lib/db.ts:20`), so `npm run dev` works without a database only until a request hits an API route.
+`migrate`/`seed`/`reset` throw at import time if `DATABASE_URL` is unset — they exist to talk to the database, so failing loudly is right. The app does **not**: `lib/db.ts` builds its pool on the first query, not on import. That is deliberate. `next build` imports every route to analyse it, so connecting at import time made the whole build fail when `DATABASE_URL` was absent, with an error that pointed nowhere near the cause. Keep the pool lazy.
 
 ## Base de dados local
 
@@ -48,7 +48,7 @@ Both paths are in the parent directory, which is not a git repository, so they c
 
 ## Architecture
 
-**Next.js 16 App Router + React 19 + TypeScript, with raw SQL over `pg`.** Prisma is vestigial: `prisma/schema.prisma`, `prisma.config.ts`, `dev.db`, and the parent's `generated/prisma/` are leftovers from an abandoned approach and are not used at runtime. The Prisma schema still describes the *correct* table shape (`Participant`/`Response`), which the SQL migrations do not — see Known issues.
+**Next.js 16 App Router + React 19 + TypeScript, with raw SQL over `pg`.** There is no ORM. Prisma was abandoned early and its leftovers (`prisma.config.ts`, `prisma/schema.prisma`, `dev.db`) were deleted after `prisma.config.ts` broke a Render deploy: it imported `prisma/config`, which is not a dependency. Local builds passed because `incremental: true` plus a stale `tsconfig.tsbuildinfo` skipped re-checking the unchanged file; Render builds from scratch and caught it. **To reproduce a Render build locally, delete `tsconfig.tsbuildinfo` and `.next` first** — otherwise the cache can hide type errors in files you have not touched.
 
 **Two separate database layers, deliberately duplicated:**
 - `lib/db.ts` — ESM/TypeScript, used by API routes.
@@ -66,11 +66,11 @@ Marking a question `core: true` moves it between the two; nothing else needs tou
 
 **The quiz UI asks one question per screen** (`app/page.tsx`), phases `name → quiz → done`, walking `allQuestions` from 1/27 to 27/27 and submitting straight from the last one. Nothing interrupts the sequence.
 
-With a screen to itself, each choice question gets large tappable buttons rather than a native `<select>`; tapping an option records it **and advances in the same gesture, with no timer** — an earlier version used a ~260 ms pause and it read as sluggish. The exception is "Outra", which must stay put so the free-text field can be filled.
+With a screen to itself, each choice question gets large tappable buttons rather than a native `<select>`. **Tapping an option only records it — advancing is always an explicit "Continuar".** Two earlier versions advanced on tap (one after a ~260 ms pause, one instantly); both were rejected, because you cannot change your mind and a stray tap costs you a question. Keep the two actions separate.
 
-`avancar()` takes the answers as arguments because the tap that answers is the same tap that advances, and React state has not been applied yet at that point — reading from state there would submit the previous answer on the final question.
+"Continuar" is therefore always rendered, never conditional on having answered — it is the single way forward, and a button that appears only after answering would jump under the reader's thumb at the moment they aim for it. There is no "Saltar": every question is optional, so continuing with a blank answer *is* skipping, and a second forward button competing with the first was the confusion worth removing. A quiet "Podes deixar em branco." sits next to Voltar while the question is unanswered.
 
-The nav is two fixed rows (primary full-width on top, Voltar/Saltar under it) rather than one flex row. On a 320 px screen the single row wrapped and left the primary button stranded mid-line.
+The nav is two fixed rows (primary full-width on top, Voltar under it) rather than one flex row. On a 320 px screen the single row wrapped and left the primary button stranded mid-line.
 
 This layout has flipped twice on request — one-per-screen, then a single scrolling form, now one-per-screen again. Confirm before changing it a fourth time.
 
@@ -113,7 +113,17 @@ This is deliberately stronger than it was: the original token was `base64(userna
 
 ## Deployment (Render Blueprint)
 
-Render reads `render.yaml` from the repository root — that is **this directory's** `render.yaml`, not the parent's. It provisions a free web service plus a free Postgres, injecting `DATABASE_URL` from the database and setting `NODE_ENV=production`.
+Render reads `render.yaml` from the repository root — that is **this directory's** `render.yaml`, not the parent's. It provisions a free web service plus a free Postgres, injecting `DATABASE_URL` from the database.
+
+**`render.yaml` only applies to services created as a Blueprint.** A service created by hand through "New → Web Service" keeps whatever is typed in the dashboard and ignores this file entirely — which is how a deploy once ran `npm install; npm run build` with no migrations. If the dashboard and this file disagree, the dashboard is what ran.
+
+The split of work is deliberate:
+- **build** — `npm install && npm run build`. Touches no database, so a connection problem can never fail a compile.
+- **start** — `npm run migrate && npm run start`. Migrations run at boot; they are idempotent (`CREATE ... IF NOT EXISTS`), so every restart re-applying them is harmless. Any new migration must keep that property.
+
+`npm run seed` is not run on Render: the only seed file is a documented no-op, since questions live in `lib/quiz.ts`.
+
+Auto-deploy on push to `master` needs the GitHub repository properly connected to Render. A build log saying *"It looks like we don't have access to your repo, but we'll try to clone it anyway"* means it is not — the clone still works for a public repo, but no webhook arrives, so pushes will not trigger anything.
 
 ## Known issues
 
